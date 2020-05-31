@@ -1,7 +1,7 @@
 #include <DHT.h>
 
 // set this to print the values to serial for monitoring
-#define DO_MONITORING
+// #define DO_MONITORING
 
 // configuration of the buzzer
 #define BUZZER_PIN 5
@@ -13,16 +13,12 @@
 #define DHT_READ_DELAY_INIT 3000
 #define DHT_READ_DELAY_WORK 60000
 
-// configure the thresholds when to start buzzing
-#define HUMIDITY_THRESH_COEFF 1.1
-#define TEMPERATURE_THRESH_COEFF 1.1
-
 // object for interfacing with the sensor
 DHT dht(DHT_PIN, DHT_TYPE);
 
-// actual threshold values that are filled in the setup()
-float threshold_humidity;
-float threshold_temperature;
+// initial and maximum humidity
+float initial_humidity;
+float maximal_humidity;
 
 // true if alarm buzzing is done and the buzzer should be silent from now on
 bool done = false;
@@ -34,11 +30,11 @@ void setup() {
     while (true) {
         dht.begin();
         delay(DHT_READ_DELAY_INIT);
-        const float normal_humidity = dht.readHumidity();
-        const float normal_temperature = dht.readTemperature();
-        if (!isnan(normal_humidity) && !isnan(normal_temperature)) {
-            threshold_humidity = normal_humidity * HUMIDITY_THRESH_COEFF;
-            threshold_temperature = normal_temperature * TEMPERATURE_THRESH_COEFF;
+        const float current_humidity = dht.readHumidity();
+        const float current_temperature = dht.readTemperature();
+        if (!isnan(current_humidity) && !isnan(current_temperature)) {
+            initial_humidity = current_humidity;
+            maximal_humidity = current_humidity;
             break;
         }
     }
@@ -47,6 +43,11 @@ void setup() {
     tone(BUZZER_PIN, BUZZER_FREQ);
     delay(250);
     noTone(BUZZER_PIN);
+
+    // wait for 3 minutes to make sure we are under the shower :)
+#ifndef DO_MONITORING
+    delay(180000);
+#endif
 }
 
 void loop() {
@@ -75,22 +76,27 @@ void loop() {
     }
 
     // output for debugging
-    Serial.print("Humidity: ");
-    Serial.println(current_humidity);
-    Serial.print("Temperature: ");
+    Serial.print(current_humidity);
+    Serial.print('\t');
     Serial.println(current_temperature);
 
-    // are the humidity and temperature again under the threshold?
-    if (current_humidity < threshold_humidity && current_temperature < threshold_temperature) {
-        // buzz for 3 minutes
-        tone(BUZZER_PIN, BUZZER_FREQ);
-        delay(180000);
+    // store new maximal humidity or check if we are low enough again
+    if (current_humidity > maximal_humidity) {
+        maximal_humidity = current_humidity;
+    } else {
+        const float delta_humidity = maximal_humidity - initial_humidity;
+        const float threshold_humidity = initial_humidity + (delta_humidity * 0.5);
+        if (delta_humidity > 20.0 && current_humidity < threshold_humidity) {
+            // buzz for 3 minutes
+            tone(BUZZER_PIN, BUZZER_FREQ);
+            delay(180000);
 
-        // deactive the buzzer
-        noTone(BUZZER_PIN);
+            // deactive the buzzer
+            noTone(BUZZER_PIN);
 
-        // signal that we are done
-        done = true;
+            // signal that we are done
+            done = true;
+        }
     }
 #endif
 }
