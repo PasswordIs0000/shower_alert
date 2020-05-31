@@ -4,6 +4,7 @@ This project uses an Arduino Micro with a DHT sensor and 6V buzzer attached. The
 
 Libraries used:
 - Adafruit DHT
+- Rocketscream Low-Power
 
 Hardware layout:
 - PIN 5: 6V buzzer

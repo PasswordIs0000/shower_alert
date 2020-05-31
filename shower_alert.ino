@@ -1,7 +1,11 @@
 #include <DHT.h>
+#include "LowPower.h"
 
 // set this to print the values to serial for monitoring
 // #define DO_MONITORING
+
+// set this to not use low power states in order to use the serial communication
+// #define DO_DEBUGGING
 
 // configuration of the buzzer
 #define BUZZER_PIN 5
@@ -10,8 +14,8 @@
 // configuration of the dht sensor
 #define DHT_PIN 7
 #define DHT_TYPE DHT11
-#define DHT_READ_DELAY_INIT 3000
-#define DHT_READ_DELAY_WORK 60000
+#define DHT_READ_DELAY_INIT 3
+#define DHT_READ_DELAY_WORK 60
 
 // object for interfacing with the sensor
 DHT dht(DHT_PIN, DHT_TYPE);
@@ -23,13 +27,35 @@ float maximal_humidity;
 // true if alarm buzzing is done and the buzzer should be silent from now on
 bool done = false;
 
+void delay_low_power(int seconds) {
+#if defined(DO_MONITORING) || defined(DO_DEBUGGING)
+    for (int i = 0; i < seconds; ++i) {
+        delay(1000);
+    }
+#else
+    if (seconds < 4) {
+        for (int i = 0; i < seconds; ++i) {
+            LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF);
+        }
+    } else {
+        const int num_cycles = seconds / 4;
+        for (int i = 0; i < seconds; ++i) {
+            LowPower.powerDown(SLEEP_4S, ADC_OFF, BOD_OFF);
+        }
+    }
+#endif
+}
+
 void setup() {
     Serial.begin(9600);
+
+    // WARNING: do not use delay_low_power() here and give the user some time to e.g. upload sketches.
+    //          uploading new sketches won't be able while in delay_low_power()!!!
 
     // make sure the sensor is initialized and read the normal/baseline humidity and temperature
     while (true) {
         dht.begin();
-        delay(DHT_READ_DELAY_INIT);
+        delay(DHT_READ_DELAY_INIT*1000);
         const float current_humidity = dht.readHumidity();
         const float current_temperature = dht.readTemperature();
         if (!isnan(current_humidity) && !isnan(current_temperature)) {
@@ -45,15 +71,17 @@ void setup() {
     noTone(BUZZER_PIN);
 
     // wait for 3 minutes to make sure we are under the shower :)
-#ifndef DO_MONITORING
+#if !defined(DO_MONITORING)
+    Serial.println("# Waiting 3 minutes.");
     delay(180000);
+    Serial.println("# Startup finished.");
 #endif
 }
 
 void loop() {
     // do monitoring or actual use-case work for shower alert?
-#ifdef DO_MONITORING
-    delay(DHT_READ_DELAY_WORK);
+#if defined(DO_MONITORING)
+    delay(DHT_READ_DELAY_WORK*1000);
     const float current_humidity = dht.readHumidity();
     const float current_temperature = dht.readTemperature();
     Serial.print(current_humidity);
@@ -63,12 +91,13 @@ void loop() {
     // are we already done? make sure the buzzer is off and sleep for 10 minutes in an endless loop.
     if (done) {
         noTone(BUZZER_PIN);
-        delay(600000);
+        delay_low_power(600);
         return;
     }
 
     // read
-    delay(DHT_READ_DELAY_WORK);
+    delay_low_power(DHT_READ_DELAY_WORK);
+    Serial.println("# Reading values.");
     const float current_humidity = dht.readHumidity();
     const float current_temperature = dht.readTemperature();
     if (isnan(current_humidity) || isnan(current_temperature)) {
