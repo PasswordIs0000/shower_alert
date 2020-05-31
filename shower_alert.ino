@@ -1,5 +1,8 @@
 #include <DHT.h>
 
+// set this to print the values to serial for monitoring
+#define DO_MONITORING
+
 // configuration of the buzzer
 #define BUZZER_PIN 5
 #define BUZZER_FREQ 100
@@ -7,7 +10,8 @@
 // configuration of the dht sensor
 #define DHT_PIN 7
 #define DHT_TYPE DHT11
-#define DHT_READ_DELAY 3000
+#define DHT_READ_DELAY_INIT 3000
+#define DHT_READ_DELAY_WORK 60000
 
 // configure the thresholds when to start buzzing
 #define HUMIDITY_THRESH_COEFF 1.1
@@ -29,7 +33,7 @@ void setup() {
     // make sure the sensor is initialized and read the normal/baseline humidity and temperature
     while (true) {
         dht.begin();
-        delay(DHT_READ_DELAY);
+        delay(DHT_READ_DELAY_INIT);
         const float normal_humidity = dht.readHumidity();
         const float normal_temperature = dht.readTemperature();
         if (!isnan(normal_humidity) && !isnan(normal_temperature)) {
@@ -43,12 +47,18 @@ void setup() {
     tone(BUZZER_PIN, BUZZER_FREQ);
     delay(250);
     noTone(BUZZER_PIN);
-
-    // wait 3 minutes to make sure we're under the shower :)
-    delay(180000);
 }
 
 void loop() {
+    // do monitoring or actual use-case work for shower alert?
+#ifdef DO_MONITORING
+    delay(DHT_READ_DELAY_WORK);
+    const float current_humidity = dht.readHumidity();
+    const float current_temperature = dht.readTemperature();
+    Serial.print(current_humidity);
+    Serial.print('\t');
+    Serial.println(current_temperature);
+#else
     // are we already done? make sure the buzzer is off and sleep for 10 minutes in an endless loop.
     if (done) {
         noTone(BUZZER_PIN);
@@ -56,8 +66,8 @@ void loop() {
         return;
     }
 
-    // read every 60 seconds
-    delay(60000);
+    // read
+    delay(DHT_READ_DELAY_WORK);
     const float current_humidity = dht.readHumidity();
     const float current_temperature = dht.readTemperature();
     if (isnan(current_humidity) || isnan(current_temperature)) {
@@ -82,4 +92,5 @@ void loop() {
         // signal that we are done
         done = true;
     }
+#endif
 }
