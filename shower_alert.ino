@@ -24,6 +24,9 @@ DHT dht(DHT_PIN, DHT_TYPE);
 float initial_humidity;
 float maximal_humidity;
 
+// starting time
+unsigned long start_time;
+
 // true if alarm buzzing is done and the buzzer should be silent from now on
 bool done = false;
 
@@ -70,6 +73,9 @@ void setup() {
         }
     }
 
+    // store the start time
+    start_time = millis();
+
     // buzz once to signal the start
     tone(BUZZER_PIN, BUZZER_FREQ);
     delay(250);
@@ -100,6 +106,15 @@ void loop() {
         return;
     }
 
+    // are we over the time limit of one hour?
+    const unsigned long current_time = millis();
+    const unsigned long runtime_seconds = (current_time - start_time) / 1000;
+    if (runtime_seconds > 3600) {
+        Serial.println("# Runtime limit reached.");
+        done = true;
+        return;
+    }
+
     // read
     delay(DHT_READ_DELAY_WORK);
     Serial.println("# Reading values.");
@@ -120,7 +135,7 @@ void loop() {
         maximal_humidity = current_humidity;
     } else {
         const float delta_humidity = maximal_humidity - initial_humidity;
-        const float threshold_humidity = initial_humidity + (delta_humidity * 0.5);
+        const float threshold_humidity = initial_humidity + (delta_humidity * 0.3);
         if (delta_humidity > 20.0 && current_humidity < threshold_humidity) {
             // buzz for 3 minutes
             tone(BUZZER_PIN, BUZZER_FREQ);
