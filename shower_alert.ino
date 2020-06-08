@@ -111,6 +111,15 @@ void loop() {
     const unsigned long runtime_seconds = (current_time - start_time) / 1000;
     if (runtime_seconds > 3600) {
         Serial.println("# Runtime limit reached.");
+        
+        // buzz for 3 minutes
+        tone(BUZZER_PIN, BUZZER_FREQ);
+        delay(180000);
+
+        // deactivate the buzzer
+        noTone(BUZZER_PIN);
+
+        // signal that we are done
         done = true;
         return;
     }
@@ -132,16 +141,19 @@ void loop() {
 
     // store new maximal humidity or check if we are low enough again
     if (current_humidity > maximal_humidity) {
+        Serial.println("# Humidity is increasing.");
         maximal_humidity = current_humidity;
     } else {
         const float delta_humidity = maximal_humidity - initial_humidity;
         const float threshold_humidity = initial_humidity + (delta_humidity * 0.3);
         if (delta_humidity > 20.0 && current_humidity < threshold_humidity) {
+            Serial.println("# Humidity reached a low state again.");
+
             // buzz for 3 minutes
             tone(BUZZER_PIN, BUZZER_FREQ);
             delay(180000);
 
-            // deactive the buzzer
+            // deactivate the buzzer
             noTone(BUZZER_PIN);
 
             // signal that we are done
